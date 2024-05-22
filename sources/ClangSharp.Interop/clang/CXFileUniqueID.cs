@@ -10,11 +10,6 @@ namespace ClangSharp.Interop;
 public partial struct CXFileUniqueID
 {
     [NativeTypeName("unsigned long long[3]")]
-    public _data_e__FixedBuffer data;
+    public unsafe fixed ulong data[3];
 
-    [InlineArray(3)]
-    public partial struct _data_e__FixedBuffer
-    {
-        public ulong e0;
-    }
 }

@@ -10,13 +10,8 @@ namespace ClangSharp.Interop;
 public unsafe partial struct CXToken
 {
     [NativeTypeName("unsigned int[4]")]
-    public _int_data_e__FixedBuffer int_data;
+    public unsafe fixed uint int_data[4];
 
     public void* ptr_data;
 
-    [InlineArray(4)]
-    public partial struct _int_data_e__FixedBuffer
-    {
-        public uint e0;
-    }
 }

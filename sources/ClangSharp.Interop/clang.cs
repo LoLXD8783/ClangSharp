@@ -6,7 +6,9 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
+#if NET7_0_OR_GREATER
 [assembly: DisableRuntimeMarshalling]
+#endif
 
 namespace ClangSharp.Interop;
 
