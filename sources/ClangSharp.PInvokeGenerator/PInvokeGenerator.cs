@@ -435,6 +435,7 @@ public sealed partial class PInvokeGenerator : IDisposable
             GenerateNativeBitfieldAttribute(this, stream, leaveStreamOpen);
             GenerateNativeInheritanceAttribute(this, stream, leaveStreamOpen);
             GenerateNativeTypeNameAttribute(this, stream, leaveStreamOpen);
+            GenerateNativeAnnotationAttribute(this, stream, leaveStreamOpen);
             GenerateSetsLastSystemErrorAttribute(this, stream, leaveStreamOpen);
             GenerateVtblIndexAttribute(this, stream, leaveStreamOpen);
             GenerateTransparentStructs(this, stream, leaveStreamOpen);
@@ -781,6 +782,96 @@ public sealed partial class PInvokeGenerator : IDisposable
             sw.WriteLine("    /// <summary>Gets the name of the type that was used in the native signature.</summary>");
             sw.Write(indentString);
             sw.WriteLine("    public string Name => _name;");
+            sw.Write(indentString);
+            sw.WriteLine('}');
+
+            if (!generator.Config.GenerateFileScopedNamespaces)
+            {
+                sw.WriteLine('}');
+            }
+
+            if (!leaveStreamOpen)
+            {
+                stream = null;
+            }
+        }
+
+        static void GenerateNativeAnnotationAttribute(PInvokeGenerator generator, Stream? stream, bool leaveStreamOpen)
+        {
+            const string AttributeName = "NativeAnnotationAttribute";
+            var config = generator.Config;
+
+            var ns = generator.GetNamespace(AttributeName);
+            if (config.ExcludedNames.Contains(AttributeName) || config.ExcludedNames.Contains($"{ns}.{AttributeName}"))
+            {
+                return;
+            }
+
+            if (stream is null)
+            {
+                var outputPath = Path.Combine(config.OutputLocation, $"{AttributeName}.cs");
+                stream = generator._outputStreamFactory(outputPath);
+            }
+
+            using var sw = new StreamWriter(stream, s_defaultStreamWriterEncoding, DefaultStreamWriterBufferSize, leaveStreamOpen);
+            sw.NewLine = "\n";
+
+            if (!string.IsNullOrEmpty(config.HeaderText))
+            {
+                sw.WriteLine(config.HeaderText);
+            }
+
+            var indentString = "    ";
+
+            sw.WriteLine("using System;");
+            sw.WriteLine("using System.Diagnostics;");
+            sw.WriteLine();
+
+            sw.Write("namespace ");
+            sw.Write(ns);
+
+            if (generator.Config.GenerateFileScopedNamespaces)
+            {
+                sw.WriteLine(';');
+                sw.WriteLine();
+                indentString = "";
+            }
+            else
+            {
+                sw.WriteLine();
+                sw.WriteLine('{');
+            }
+
+            sw.Write(indentString);
+            sw.WriteLine("/// <summary>Defines the annotation found in a native declaration.</summary>");
+            sw.Write(indentString);
+            sw.WriteLine("[AttributeUsage(AttributeTargets.Struct | AttributeTargets.Enum | AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter | AttributeTargets.ReturnValue, AllowMultiple = true, Inherited = false)]");
+            sw.Write(indentString);
+            sw.WriteLine("[Conditional(\"DEBUG\")]");
+            sw.Write(indentString);
+            sw.WriteLine($"internal sealed partial class {AttributeName} : Attribute");
+            sw.Write(indentString);
+            sw.WriteLine('{');
+            sw.Write(indentString);
+            sw.WriteLine("    private readonly string _annotation;");
+            sw.WriteLine();
+            sw.Write(indentString);
+            sw.WriteLine($"    /// <summary>Initializes a new instance of the <see cref=\"{AttributeName}\" /> class.</summary>");
+            sw.Write(indentString);
+            sw.WriteLine("    /// <param name=\"annotation\">The annotation that was used in the native declaration.</param>");
+            sw.Write(indentString);
+            sw.WriteLine($"    public {AttributeName}(string annotation)");
+            sw.Write(indentString);
+            sw.WriteLine("    {");
+            sw.Write(indentString);
+            sw.WriteLine("        _annotation = annotation;");
+            sw.Write(indentString);
+            sw.WriteLine("    }");
+            sw.WriteLine();
+            sw.Write(indentString);
+            sw.WriteLine("    /// <summary>Gets the annotation that was used in the native declaration.</summary>");
+            sw.Write(indentString);
+            sw.WriteLine("    public string Annotation => _annotation;");
             sw.Write(indentString);
             sw.WriteLine('}');
 
@@ -2326,13 +2417,23 @@ public sealed partial class PInvokeGenerator : IDisposable
         }
     }
 
-    private string EscapeAndStripName(string name)
+    private string EscapeAndStripMethodName(string name)
     {
-        if (name.StartsWith(_config.MethodPrefixToStrip, StringComparison.Ordinal))
-        {
-            name = name[_config.MethodPrefixToStrip.Length..];
-        }
+        name = PrefixAndStrip(name, _config.MethodPrefixToStrip);
+        return EscapeName(name);
+    }
 
+    private string EscapeAndStripEnumMemberName(string name, string enumTypeName)
+    {
+        if (Config.StripEnumMemberTypeName)
+        {
+            var escapedName = PrefixAndStrip(name, enumTypeName, trimChar: '_');
+            if (escapedName.Length > 0 && char.IsAsciiDigit(escapedName[0]))
+            {
+                escapedName = '_' + escapedName;
+            }
+            return escapedName;
+        }
         return EscapeName(name);
     }
 
@@ -6198,13 +6299,32 @@ public sealed partial class PInvokeGenerator : IDisposable
         }
     }
 
-    private string PrefixAndStripName(string name, uint overloadIndex)
+    /// <summary>
+    /// Checks whether the specified name starts with a prefix, optionally trims a separator character following the prefix and returns the remainder.
+    /// </summary>
+    /// <param name="name">The name to strip.</param>
+    /// <param name="prefix">The prefix to strip from <paramref name="name"/>.</param>
+    /// <param name="trimChar">Additional separator that may follow <paramref name="prefix"/> which should also be trimmed away.</param>
+    /// <returns>
+    /// <paramref name="name"/> if it does not start with <paramref name="prefix"/>;
+    /// otherwise,
+    /// the remainder of <paramref name="name"/> after stripping <paramref name="prefix"/> and all immediate following occurences of <paramref name="trimChar"/> from it beginning.
+    /// </returns>
+    private static string PrefixAndStrip(string name, string prefix, char trimChar = '\0')
     {
-        if (name.StartsWith(_config.MethodPrefixToStrip, StringComparison.Ordinal))
+        var nameSpan = name.AsSpan();
+        if (nameSpan.StartsWith(prefix, StringComparison.Ordinal))
         {
-            name = name[_config.MethodPrefixToStrip.Length..];
+            nameSpan = nameSpan[prefix.Length..];
+            nameSpan = nameSpan.TrimStart(trimChar);
+            return nameSpan.ToString();
         }
+        return name;
+    }
 
+    private string PrefixAndStripMethodName(string name, uint overloadIndex)
+    {
+        name = PrefixAndStrip(name, _config.MethodPrefixToStrip);
         return $"_{name}{((overloadIndex != 0) ? overloadIndex.ToString(CultureInfo.InvariantCulture) : "")}";
     }
 
@@ -6692,6 +6812,13 @@ public sealed partial class PInvokeGenerator : IDisposable
                             outputBuilder.WriteCustomAttribute($"Obsolete");
                         }
                         obsoleteEmitted = true;
+                        break;
+                    }
+
+                    case CX_AttrKind_Annotate:
+                    {
+                        var annotationText = attr.Spelling;
+                        outputBuilder.WriteCustomAttribute($"""NativeAnnotation("{annotationText}")""");
                         break;
                     }
 
