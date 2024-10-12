@@ -6765,7 +6765,7 @@ public sealed partial class PInvokeGenerator : IDisposable
         var outputBuilder = isTestOutput ? _testOutputBuilder : _outputBuilder;
         Debug.Assert(outputBuilder is not null);
 
-        if (TryGetRemappedValue(namedDecl, _config.WithAttributes, out var attributes))
+        if (TryGetRemappedValue(namedDecl, _config.WithAttributes, out var attributes, matchStar: true))
         {
             foreach (var attribute in attributes.Where((a) => !onlySupportedOSPlatform || a.StartsWith("SupportedOSPlatform(", StringComparison.Ordinal)))
             {
@@ -6817,7 +6817,7 @@ public sealed partial class PInvokeGenerator : IDisposable
 
                     case CX_AttrKind_Annotate:
                     {
-                        var annotationText = attr.Spelling;
+                        var annotationText = EscapeString(attr.Spelling);
                         outputBuilder.WriteCustomAttribute($"""NativeAnnotation("{annotationText}")""");
                         break;
                     }
