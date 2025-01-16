@@ -925,7 +925,7 @@ namespace ClangSharp.Test
         {
             get
             {
-                fixed (_Anonymous_e__Union._Anonymous_e__Union* pField = &Anonymous.Anonymous)
+                fixed (_Anonymous_e__Union._Anonymous_1_e__Union* pField = &Anonymous.Anonymous_1)
                 {
                     return ref pField->w;
                 }
@@ -936,12 +936,12 @@ namespace ClangSharp.Test
         {
             get
             {
-                return Anonymous.Anonymous.o0_b0_16;
+                return Anonymous.Anonymous_1.o0_b0_16;
             }
 
             set
             {
-                Anonymous.Anonymous.o0_b0_16 = value;
+                Anonymous.Anonymous_1.o0_b0_16 = value;
             }
         }
 
@@ -949,12 +949,12 @@ namespace ClangSharp.Test
         {
             get
             {
-                return Anonymous.Anonymous.o0_b16_4;
+                return Anonymous.Anonymous_1.o0_b16_4;
             }
 
             set
             {
-                Anonymous.Anonymous.o0_b16_4 = value;
+                Anonymous.Anonymous_1.o0_b16_4 = value;
             }
         }
 
@@ -966,10 +966,10 @@ namespace ClangSharp.Test
 
             [FieldOffset(0)]
             [NativeTypeName(""__AnonymousRecord_ClangUnsavedFile_L10_C9"")]
-            public _Anonymous_e__Union Anonymous;
+            public _Anonymous_1_e__Union Anonymous_1;
 
             [StructLayout(LayoutKind.Explicit)]
-            public partial struct _Anonymous_e__Union
+            public partial struct _Anonymous_1_e__Union
             {
                 [FieldOffset(0)]
                 public int w;
@@ -1454,6 +1454,116 @@ namespace ClangSharp.Test
         [FieldOffset(0)]
         [NativeTypeName(""MyTypedefAlias"")]
         public {expectedManagedType} b;
+    }}
+}}
+";
+
+        return ValidateGeneratedCSharpCompatibleWindowsBindingsAsync(inputContents, expectedOutputContents);
+    }
+
+    protected override Task UnionWithAnonStructWithAnonUnionImpl()
+    {
+        var inputContents = $@"typedef union _MY_UNION
+{{
+    long AsArray[2];
+    struct
+    {{
+        long First;
+        union
+        {{
+            struct
+            {{
+                long Second;
+            }} A;
+
+            struct
+            {{
+                long Second;
+            }} B;
+        }};
+    }};
+}} MY_UNION;";
+
+        var expectedOutputContents = $@"using System.Runtime.InteropServices;
+
+namespace ClangSharp.Test
+{{
+    [StructLayout(LayoutKind.Explicit)]
+    public unsafe partial struct _MY_UNION
+    {{
+        [FieldOffset(0)]
+        [NativeTypeName(""long[2]"")]
+        public fixed int AsArray[2];
+
+        [FieldOffset(0)]
+        [NativeTypeName(""__AnonymousRecord_ClangUnsavedFile_L4_C5"")]
+        public _Anonymous_e__Struct Anonymous;
+
+        public ref int First
+        {{
+            get
+            {{
+                fixed (_Anonymous_e__Struct* pField = &Anonymous)
+                {{
+                    return ref pField->First;
+                }}
+            }}
+        }}
+
+        public ref _Anonymous_e__Struct._Anonymous_1_e__Union._A_e__Struct A
+        {{
+            get
+            {{
+                fixed (_Anonymous_e__Struct._Anonymous_1_e__Union* pField = &Anonymous.Anonymous_1)
+                {{
+                    return ref pField->A;
+                }}
+            }}
+        }}
+
+        public ref _Anonymous_e__Struct._Anonymous_1_e__Union._B_e__Struct B
+        {{
+            get
+            {{
+                fixed (_Anonymous_e__Struct._Anonymous_1_e__Union* pField = &Anonymous.Anonymous_1)
+                {{
+                    return ref pField->B;
+                }}
+            }}
+        }}
+
+        public unsafe partial struct _Anonymous_e__Struct
+        {{
+            [NativeTypeName(""long"")]
+            public int First;
+
+            [NativeTypeName(""__AnonymousRecord_ClangUnsavedFile_L7_C9"")]
+            public _Anonymous_1_e__Union Anonymous_1;
+
+            [StructLayout(LayoutKind.Explicit)]
+            public unsafe partial struct _Anonymous_1_e__Union
+            {{
+                [FieldOffset(0)]
+                [NativeTypeName(""__AnonymousRecord_ClangUnsavedFile_L9_C13"")]
+                public _A_e__Struct A;
+
+                [FieldOffset(0)]
+                [NativeTypeName(""__AnonymousRecord_ClangUnsavedFile_L14_C13"")]
+                public _B_e__Struct B;
+
+                public partial struct _A_e__Struct
+                {{
+                    [NativeTypeName(""long"")]
+                    public int Second;
+                }}
+
+                public partial struct _B_e__Struct
+                {{
+                    [NativeTypeName(""long"")]
+                    public int Second;
+                }}
+            }}
+        }}
     }}
 }}
 ";

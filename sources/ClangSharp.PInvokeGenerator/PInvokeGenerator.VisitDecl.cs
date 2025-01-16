@@ -865,7 +865,7 @@ public partial class PInvokeGenerator
             return;
         }
 
-        if (IsPrevContextDecl<RecordDecl>(out var prevContext, out _) && prevContext.IsAnonymousStructOrUnion)
+        if (IsPrevContextDecl<RecordDecl>(out var prevContext, out _) && prevContext.IsAnonymous)
         {
             // We shouldn't process indirect fields where the prev context is an anonymous record decl
             return;
@@ -880,28 +880,15 @@ public partial class PInvokeGenerator
         var contextNameParts = new Stack<string>();
         var contextTypeParts = new Stack<string>();
 
-        while (rootRecordDecl.IsAnonymousStructOrUnion && (rootRecordDecl.Parent is RecordDecl parentRecordDecl))
+        while (rootRecordDecl.IsAnonymous && (rootRecordDecl.Parent is RecordDecl parentRecordDecl))
         {
+            // The name of a field of an anonymous type should be same as the type's name minus the
+            // type kind tag at the end and the leading `_`.
             var contextNamePart = GetRemappedCursorName(rootRecordDecl);
-
-            if (contextNamePart.StartsWith('_'))
-            {
-                var suffixLength = 0;
-
-                if (contextNamePart.EndsWith("_e__Union", StringComparison.Ordinal))
-                {
-                    suffixLength = 10;
-                }
-                else if (contextNamePart.EndsWith("_e__Struct", StringComparison.Ordinal))
-                {
-                    suffixLength = 11;
-                }
-
-                if (suffixLength != 0)
-                {
-                    contextNamePart = contextNamePart.Substring(1, contextNamePart.Length - suffixLength);
-                }
-            }
+            var tagIndex = contextNamePart.LastIndexOf("_e__", StringComparison.Ordinal);
+            Debug.Assert(contextNamePart[0] == '_');
+            Debug.Assert(tagIndex >= 0);
+            contextNamePart = contextNamePart.Substring(1, tagIndex - 1);
 
             contextNameParts.Push(EscapeName(contextNamePart));
 
@@ -969,12 +956,7 @@ public partial class PInvokeGenerator
 
         var isFixedSizedBuffer = IsTypeConstantOrIncompleteArray(indirectFieldDecl, type);
         var generateCompatibleCode = _config.GenerateCompatibleCode;
-        var typeString = string.Empty;
-
-        if (!fieldDecl.IsBitField && (!isFixedSizedBuffer || generateCompatibleCode))
-        {
-            typeString = "ref ";
-        }
+        var typeStringBuilder = new StringBuilder();
 
         if (IsType<RecordType>(indirectFieldDecl, type, out var recordType))
         {
@@ -985,10 +967,15 @@ public partial class PInvokeGenerator
                 var parentRecordDeclName = GetRemappedCursorName(parentRecordDecl);
                 var escapedParentRecordDeclName = EscapeName(parentRecordDeclName);
 
-                typeString += escapedParentRecordDeclName + '.';
+                _ = typeStringBuilder.Insert(0, '.').Insert(0, escapedParentRecordDeclName);
 
                 recordDecl = parentRecordDecl;
             }
+        }
+
+        if (!fieldDecl.IsBitField && (!isFixedSizedBuffer || generateCompatibleCode))
+        {
+            _ = typeStringBuilder.Insert(0, "ref ");
         }
 
         var isSupportedFixedSizedBufferType = isFixedSizedBuffer && IsSupportedFixedSizedBufferType(typeName);
@@ -998,21 +985,22 @@ public partial class PInvokeGenerator
             if (!generateCompatibleCode)
             {
                 _outputBuilder.EmitSystemSupport();
-                typeString += "Span<";
+                _ = typeStringBuilder.Append("Span<");
             }
             else if (!isSupportedFixedSizedBufferType)
             {
-                typeString += contextType + '.';
+                _ = typeStringBuilder.Append(contextType).Append('.');
                 typeName = GetArtificialFixedSizedBufferName(fieldDecl);
             }
         }
 
-        typeString += typeName;
+        _ = typeStringBuilder.Append(typeName);
         if (isFixedSizedBuffer && !generateCompatibleCode)
         {
-            typeString += '>';
+            _ = typeStringBuilder.Append('>');
         }
 
+        var typeString = typeStringBuilder.ToString();
         _outputBuilder.WriteRegularField(typeString, escapedName);
 
         var isIndirectPointerField = IsTypePointerOrReference(indirectFieldDecl, type) && !typeName.Equals("IntPtr", StringComparison.Ordinal) && !typeName.Equals("UIntPtr", StringComparison.Ordinal);
@@ -1396,7 +1384,7 @@ public partial class PInvokeGenerator
             var maxAlignm = recordDecl.Fields.Any() ? recordDecl.Fields.Max((fieldDecl) => Math.Max(fieldDecl.Type.Handle.AlignOf, 1)) : alignment;
 
             var isTopLevelStruct = _config.WithTypes.TryGetValue(name, out var withType) && withType.Equals("struct", StringComparison.Ordinal);
-            var generateTestsClass = !recordDecl.IsAnonymousStructOrUnion && recordDecl.DeclContext is not RecordDecl;
+            var generateTestsClass = !recordDecl.IsAnonymous && recordDecl.DeclContext is not RecordDecl;
             var testOutputStarted = false;
 
             var nullableUuid = (Guid?)null;
