@@ -26,10 +26,38 @@ using namespace clang::cxstring;
 using namespace clang::cxtu;
 using namespace clang::cxtype;
 
+CXTemplateArgumentKind ConvertTemplateArgumentKind(TemplateArgument::ArgKind kind) {
+    switch (kind) {
+    case TemplateArgument::Null:
+        return CXTemplateArgumentKind_Null;
+    case TemplateArgument::Type:
+        return CXTemplateArgumentKind_Type;
+    case TemplateArgument::Declaration:
+        return CXTemplateArgumentKind_Declaration;
+    case TemplateArgument::NullPtr:
+        return CXTemplateArgumentKind_NullPtr;
+    case TemplateArgument::Integral:
+        return CXTemplateArgumentKind_Integral;
+    case TemplateArgument::StructuralValue:
+        // Does not exist in CXTemplateArgumentKind
+        return CXTemplateArgumentKind_Invalid;
+    case TemplateArgument::Template:
+        return CXTemplateArgumentKind_Template;
+    case TemplateArgument::TemplateExpansion:
+        return CXTemplateArgumentKind_TemplateExpansion;
+    case TemplateArgument::Expression:
+        return CXTemplateArgumentKind_Expression;
+    case TemplateArgument::Pack:
+        return CXTemplateArgumentKind_Pack;
+    default:
+        return CXTemplateArgumentKind_Invalid;
+    }
+}
+
 CX_TemplateArgument MakeCXTemplateArgument(const TemplateArgument* TA, CXTranslationUnit TU, bool needsDispose = false) {
     if (TA) {
         assert(TU && "Invalid arguments!");
-        return { static_cast<CXTemplateArgumentKind>(TA->getKind()), (needsDispose ? 1 : 0), TA, TU };
+        return { ConvertTemplateArgumentKind(TA->getKind()), (needsDispose ? 1 : 0), TA, TU };
     }
 
     return { };
@@ -1009,15 +1037,19 @@ CXCursor clangsharp_Cursor_getDefaultArg(CXCursor C) {
 }
 
 CXType clangsharp_Cursor_getDefaultArgType(CXCursor C) {
+    QualType QT;
+
     if (isDeclOrTU(C.kind)) {
         const Decl* D = getCursorDecl(C);
 
         if (const TemplateTypeParmDecl* TTPD = dyn_cast<TemplateTypeParmDecl>(D)) {
-            return MakeCXType(TTPD->getDefaultArgument(), getCursorTU(C));
+            if (TTPD->hasDefaultArgument()) {
+                QT = TTPD->getDefaultArgument();
+            }
         }
     }
 
-    return MakeCXType(QualType(), getCursorTU(C));
+    return MakeCXType(QT, getCursorTU(C));
 }
 
 CXCursor clangsharp_Cursor_getDefinition(CXCursor C) {
@@ -5367,6 +5399,17 @@ CXType clangsharp_Type_getOriginalType(CXType CT) {
     }
 
     return MakeCXType(QualType(), GetTypeTU(CT));
+}
+
+CXCursor clangsharp_Type_getSubstTemplateTypeParamAssociatedDecl(CXType CT) {
+    QualType T = GetQualType(CT);
+    const Type* TP = T.getTypePtrOrNull();
+
+    if (const SubstTemplateTypeParmType* STTPT = dyn_cast<SubstTemplateTypeParmType>(TP)) {
+        return MakeCXCursor(STTPT->getAssociatedDecl(), GetTypeTU(CT));
+    }
+
+    clang_getNullCursor();
 }
 
 CXCursor clangsharp_Type_getOwnedTagDecl(CXType CT) {
