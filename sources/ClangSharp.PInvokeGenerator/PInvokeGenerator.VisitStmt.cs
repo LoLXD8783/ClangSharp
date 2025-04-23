@@ -433,7 +433,7 @@ public partial class PInvokeGenerator
                     outputBuilder.Write("0x");
                     outputBuilder.Write(characterLiteral.Value.ToString("X8", CultureInfo.InvariantCulture));
                 }
-                else if (characterLiteral.Value > byte.MaxValue)
+                else if (characterLiteral.Value is < ' ' or > byte.MaxValue)
                 {
                     outputBuilder.Write("0x");
                     outputBuilder.Write(characterLiteral.Value.ToString("X4", CultureInfo.InvariantCulture));
