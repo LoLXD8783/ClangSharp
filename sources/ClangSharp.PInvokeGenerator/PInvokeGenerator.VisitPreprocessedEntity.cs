@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation and Contributors. All Rights Reserved. Licensed under the MIT License (MIT). See License.md in the repository root for more information.
 
 using System.Globalization;
+using ClangSharp.Extensions;
 using ClangSharp.Interop;
 using static ClangSharp.Interop.CXTokenKind;
 
@@ -35,7 +36,7 @@ public partial class PInvokeGenerator
             var macroName = $"ClangSharpMacro_{macroDefinitionRecord.Spelling}";
 
             _ = _fileContentsBuilder.Append('\n');
-            _ = _fileContentsBuilder.Append(CultureInfo.InvariantCulture, $"const {_placeholderMacroType} {macroName} = ");
+            _ = _fileContentsBuilder.AppendInvariant($"const {_placeholderMacroType} {macroName} = ");
 
             var sourceRangeEnd = tokens[^1].GetExtent(translationUnitHandle).End;
             var sourceRangeStart = tokens[1].GetLocation(translationUnitHandle);

@@ -9,7 +9,7 @@ internal partial class XmlOutputBuilder
 {
     public void WriteCustomAttribute(string attribute, Action? callback = null)
     {
-        _ = _sb.Append(CultureInfo.InvariantCulture, $"<attribute>{attribute}");
+        _ = _sb.AppendInvariant( $"<attribute>{attribute}");
         callback?.Invoke();
         _ = _sb.Append("</attribute >\n");
     }
